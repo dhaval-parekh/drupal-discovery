@@ -1,1 +1,1 @@
-# drupal-discovery
+# Drupal Discovery
