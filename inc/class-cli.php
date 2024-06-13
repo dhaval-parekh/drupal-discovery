@@ -34,12 +34,45 @@ class CLI {
 		WP_CLI::log( "Drupal version: {$version}" );
 	}
 
+	/**
+	 * Get the info of Drupal.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp drupal info
+	 *
+	 * @return void
+	 */
 	public function get_info(): void {
 		// Get the Drupal instance.
 		$drupal = Drupal::get_instance();
 
-		// Get the version.
+		// Get node types.
 		$node_types = $drupal->get_node_types();
+
+		// Output the node types.
+		echo "### Node Types \n";
+		echo $this->array_to_markdown_table( array_values( $node_types ) );
+
+		// Get taxonomy vocabularies.
+		$taxonomies = $drupal->get_taxonomies();
+
+		// Output the taxonomies.
+		echo "\n\n\n### Taxonomies \n";
+		echo $this->array_to_markdown_table( array_values( $taxonomies ) );
+	}
+
+	public function get_entity_fields( array $args = [], array $assoc_args = [] ) {
+		$node_type = ( ! empty( $args[0] ) ) ? trim( strtolower( $args[0] ) ) : '';
+
+		// Get the Drupal instance.
+		$drupal = Drupal::get_instance();
+
+		$field_data = $drupal->get_entity_fields( $node_type );
+		$database_queries = $drupal->get_entity_database_query( $node_type );
+
+		$this->array_to_markdown_table( array_values($field_data) );
+		print_r( $database_queries );
 	}
 
 	/**
@@ -47,9 +80,9 @@ class CLI {
 	 *
 	 * @param <string, string|array> $array
 	 *
-	 * @return void
+	 * @return string
 	 */
-	function array_to_markdown_table( $array ): string {
+	private function array_to_markdown_table( array $array = [] ): string {
 		foreach ( $array as $row_index => $row ) {
 			foreach ( $row as $col_index => $column ) {
 				if ( is_array( $column ) ) {
@@ -63,7 +96,7 @@ class CLI {
 			$heading[ $index ] = ucwords( str_replace( '_', ' ', $item ) );
 		}
 
-		// Find the longest string in each column
+		// Find the longest string in each column.
 		$cols = array_merge(
 			[ $heading ],
 			$array
@@ -79,7 +112,7 @@ class CLI {
 
 		$markdown = '';
 
-		// Heading
+		// Heading.
 		foreach ( $heading as $index => $item ) {
 			$markdown .= '| ' . str_pad( $item, $widths[ $index ], ' ' ) . ' ';
 		}
@@ -112,7 +145,7 @@ class CLI {
 	 *
 	 * @return string
 	 */
-	public function array_to_csv( $array ): string {
+	private function array_to_csv( $array ): string {
 		// Convert arrays to strings.
 		foreach ( $array as $row_index => $row ) {
 			foreach ( $row as $col_index => $column ) {
