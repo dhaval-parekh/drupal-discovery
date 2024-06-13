@@ -203,6 +203,8 @@ class Drupal {
 			return $entity_multiple_fields[ $entity_type ];
 		}
 
+		$entity_multiple_fields[ $entity_type ] = [];
+
 		$field_list              = $this->get_fields_by_entity_type( $entity_type );
 		$list_of_database_tables = $this->get_table_list();
 
@@ -221,10 +223,12 @@ class Drupal {
 				$this->database->prepare(
 					"SELECT entity_id, `language`, count(1) AS count
 					FROM %i
+					WHERE bundle = %s
 					GROUP BY entity_id, `language`
 					ORDER BY count DESC
 					LIMIT 0, 1;",
-					$database_table
+					$database_table,
+					$entity_type
 				),
 				ARRAY_A
 			);
@@ -316,7 +320,6 @@ class Drupal {
 		return $entity_fields;
 	}
 
-
 	public function get_entity_database_query( string $entity_type = '' ): array {
 		if ( empty( $entity_type ) ) {
 			return '';
@@ -326,19 +329,59 @@ class Drupal {
 		$fields_chunks   = array_chunk( $fields_list, CHUNK_LIMIT );
 		$multiple_fields = $this->get_multiple_fields( $entity_type );
 
-		$default_query_segment = [
-			'select' => [
-				'node.nid, node.vid, node.language, node.type, node.status, node.title, node.created, node.changed, node.comment',
-				"( SELECT count(1) FROM redirect WHERE redirect = CONCAT( 'node/', node.nid ) ) AS is_redirected",
-				"( SELECT alias FROM url_alias WHERE source = CONCAT( 'node/', node.nid ) AND language='en' ) AS drupal_url",
+		$type = '';
+
+		$node_types     = array_keys( $this->get_node_types() );
+		$taxonomy_types = array_keys( $this->get_taxonomies() );
+
+		$type_prefix = '';
+
+		if ( in_array( $entity_type, $node_types, true ) ) {
+			$type = 'node';
+			$type_prefix = 'node';
+		} elseif ( in_array( $entity_type, $taxonomy_types, true ) ) {
+			$type = 'taxonomy';
+			$type_prefix = 'terms';
+		}
+
+		if ( empty( $type ) ) {
+			return [];
+		}
+
+		$default_query_segment = match ( $type ) {
+			'node' => [
+				'select' => [
+					'node.nid, node.vid, node.language, node.type, node.status, node.title, node.created, node.changed, node.comment',
+					"( SELECT count(1) FROM redirect WHERE redirect = CONCAT( 'node/', node.nid ) ) AS is_redirected",
+					"( SELECT alias FROM url_alias WHERE source = CONCAT( 'node/', node.nid ) AND language='en' ) AS drupal_url",
+				],
+				'from'   => [
+					'node',
+				],
+				'where'  => [
+					"node.type = '$entity_type'",
+				],
 			],
-			'from'   => [
-				'node',
-			],
-			'where'  => [
-				"node.type = '$entity_type'",
-			],
-		];
+			'taxonomy' => [
+				'select' => [
+					'terms.*',
+					'vocabulary.`machine_name`',
+					'term_hierarchy.`parent`',
+					"( SELECT alias FROM url_alias WHERE source = CONCAT( '/taxonomy/term/', terms.tid ) LIMIT 0, 1 ) AS drupal_url",
+				],
+				'from'   => [
+					'taxonomy_term_data AS terms',
+					'LEFT JOIN taxonomy_vocabulary AS vocabulary ON vocabulary.vid = terms.vid',
+					'LEFT JOIN taxonomy_term_hierarchy AS term_hierarchy ON term_hierarchy.`tid` = terms.tid',
+				],
+				'where'  => [
+					"vocabulary.`machine_name` = '$entity_type'",
+				],
+				'order'  => [
+					'term_hierarchy.`parent` ASC',
+				],
+			]
+		};
 
 		$queryies = [
 			'main'     => [],
@@ -375,10 +418,22 @@ class Drupal {
 
 				if ( ! $is_multiple ) {
 					$query_segment['select'][] = implode( ",\n\t", $select );
-					$query_segment['from'][]   = "LEFT JOIN {$field['database_table']} ON node.nid = {$field['database_table']}.entity_id AND {$field['database_table']}.language = node.language";
+
+					if ( 'node' === $type ) {
+						$query_segment['from'][]   = "LEFT JOIN {$field['database_table']} ON node.nid = {$field['database_table']}.entity_id AND {$field['database_table']}.bundle = '$entity_type' AND {$field['database_table']}.language = node.language";
+					} elseif ( 'taxonomy' === $type ) {
+						$query_segment['from'][]   = "LEFT JOIN {$field['database_table']} ON terms.tid = {$field['database_table']}.entity_id AND {$field['database_table']}.bundle = '$entity_type' AND {$field['database_table']}.language IN ( terms.language, 'und' )";
+					}
+
 				} else {
-					$custom_field_query = "SELECT\n\tnode.nid,\n\t" . implode( ",\n\t", $select ) .
-					                      "\nFROM\n\tnode\n\tINNER JOIN {$field['database_table']} ON node.nid = {$field['database_table']}.entity_id AND node.language = $field_name.language;";
+
+					if ( 'node' === $type ) {
+						$custom_field_query = "SELECT\n\tnode.nid,\n\t" . implode( ",\n\t", $select ) .
+						                      "\nFROM\n\tnode\n\tINNER JOIN {$field['database_table']} ON node.nid = {$field['database_table']}.entity_id AND node.language = $field_name.language;";
+					} elseif ( 'taxonomy' === $type ) {
+						$custom_field_query = "SELECT\n\tterm.tid,\n\t" . implode( ",\n\t", $select ) .
+						                      "\nFROM\n\ttaxonomy_term_data AS term\n\tINNER JOIN `$db_table` AS `$field_name` ON term.tid = $field_name.entity_id AND term.langcode = $field_name.langcode;";
+					}
 
 					$queryies['multiple'][ $field_name ] = $custom_field_query;
 				}

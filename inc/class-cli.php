@@ -35,11 +35,52 @@ class CLI {
 	}
 
 	/**
+	 * Get the commands.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp drupal get_commands
+	 *
+	 * @return void
+	 */
+	public function get_commands() {
+		// Get the Drupal instance.
+		$drupal = Drupal::get_instance();
+
+		// Get Info
+		echo PHP_EOL . '```shell' . PHP_EOL;
+		echo 'wp drupal get_info  > docs/A.md' . PHP_EOL;
+		echo PHP_EOL .'```' . PHP_EOL;
+
+		// Node Types.
+		$node_types = array_keys( $drupal->get_node_types() );
+		$directory  = '1.node';
+
+		echo PHP_EOL . $directory . PHP_EOL . PHP_EOL;
+		echo '```shell' . PHP_EOL;
+		foreach ( $node_types as $entity_name ) {
+			printf( 'wp drupal get_entity_fields %s > docs/%s/%s.md' . PHP_EOL, $entity_name, $directory, $entity_name );
+		}
+		echo PHP_EOL .'```' . PHP_EOL;
+
+		// Taxonomies.
+		$taxonomies = array_keys( $drupal->get_taxonomies() );
+		$directory  = '2.taxonomy';
+
+		echo PHP_EOL . PHP_EOL . $directory . PHP_EOL . PHP_EOL;
+		echo '```shell' . PHP_EOL;
+		foreach ( $taxonomies as $entity_name ) {
+			printf( 'wp drupal get_entity_fields %s > docs/%s/%s.md' . PHP_EOL, $entity_name, $directory, $entity_name );
+		}
+		echo PHP_EOL .'```' . PHP_EOL;
+	}
+
+	/**
 	 * Get the info of Drupal.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp drupal info
+	 *     wp drupal get_info
 	 *
 	 * @return void
 	 */
@@ -47,42 +88,119 @@ class CLI {
 		// Get the Drupal instance.
 		$drupal = Drupal::get_instance();
 
+		// Get the version.
+		$version = $drupal->get_version();
+
+		// Output the version.
+		WP_CLI::log( PHP_EOL . "Drupal version: {$version}" . PHP_EOL . PHP_EOL );
+
 		// Get node types.
 		$node_types = $drupal->get_node_types();
 
 		// Output the node types.
-		echo "### Node Types \n";
-		echo $this->array_to_markdown_table( array_values( $node_types ) );
+		echo "### Node Types \n\n";
+		echo $this->array_to_markdown_table( array_values( $node_types ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		// Get taxonomy vocabularies.
 		$taxonomies = $drupal->get_taxonomies();
 
 		// Output the taxonomies.
-		echo "\n\n\n### Taxonomies \n";
-		echo $this->array_to_markdown_table( array_values( $taxonomies ) );
+		echo "\n\n\n### Taxonomies \n\n";
+		echo $this->array_to_markdown_table( array_values( $taxonomies ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
+		// Get languages.
+		$languages = $drupal->get_languages();
+
+		$languages_list = [];
+		foreach ( $languages as $item ) {
+			$languages_list[] = [
+				'domain '     => $item['domain'],
+				'language'    => $item['language'],
+				'wp_site'     => '',
+				'description' => '',
+			];
+		}
+
+		// Output the languages.
+		echo "\n\n\n### Languages \n\n";
+		echo $this->array_to_markdown_table( $languages_list ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
+	/**
+	 * Get the fields of a node type.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp drupal get_entity_fields article
+	 *
+	 * @param string[] $args Args
+	 * @param array<string, string|int> $assoc_args Assoc Args
+	 *
+	 * @return void
+	 */
 	public function get_entity_fields( array $args = [], array $assoc_args = [] ) {
 		$node_type = ( ! empty( $args[0] ) ) ? trim( strtolower( $args[0] ) ) : '';
 
 		// Get the Drupal instance.
 		$drupal = Drupal::get_instance();
 
-		$field_data = $drupal->get_entity_fields( $node_type );
+		$field_data       = $drupal->get_entity_fields( $node_type );
 		$database_queries = $drupal->get_entity_database_query( $node_type );
 
-		$this->array_to_markdown_table( array_values($field_data) );
-		print_r( $database_queries );
+		echo "## $node_type\n";
+
+		echo "\n#### Fields\n";
+		echo $this->array_to_markdown_table( array_values( $field_data ) );
+
+		echo "\n\n#### Main Query\n";
+
+		if ( ! empty( $database_queries['main'] ) ) {
+			foreach ( $database_queries['main'] as $query ) {
+				echo "\n```sql\n";
+				echo $query;
+				echo "\n```\n";
+			}
+		}
+
+		if ( ! empty( $database_queries['multiple'] ) ) {
+			echo "\n#### Multi selection field query : \n";
+
+			foreach ( $database_queries['multiple'] as $field_name => $query ) {
+
+				echo "\n##### $field_name\n";
+				echo "\n```sql\n";
+				echo $query;
+				echo "\n```\n";
+			}
+		}
+	}
+
+	public function get_taxonomy_fields( array $args = [], array $assoc_args = [] ) {
+		$entity_type = ( ! empty( $args[0] ) ) ? trim( strtolower( $args[0] ) ) : '';
+
+		// Get the Drupal instance.
+		$drupal = Drupal::get_instance();
+
+		$field_data = $drupal->get_entity_fields( $entity_type );
+
+		echo "## $entity_type\n";
+
+		echo "\n#### Fields\n";
+		echo $this->array_to_markdown_table( array_values( $field_data ) );
+
+
+
 	}
 
 	/**
 	 * Generate markdown from array.
 	 *
-	 * @param <string, string|array> $array
+	 * @param <string, string|array> $array Array to convert to markdown.
 	 *
-	 * @return string
+	 * @return string Markdown table.
 	 */
 	private function array_to_markdown_table( array $array = [] ): string {
+		// Convert arrays to strings.
 		foreach ( $array as $row_index => $row ) {
 			foreach ( $row as $col_index => $column ) {
 				if ( is_array( $column ) ) {
@@ -91,7 +209,10 @@ class CLI {
 			}
 		}
 
+		// Get the heading.
 		$heading = array_keys( $array[0] );
+
+		// Capitalize the heading.
 		foreach ( $heading as $index => $item ) {
 			$heading[ $index ] = ucwords( str_replace( '_', ' ', $item ) );
 		}
@@ -110,6 +231,7 @@ class CLI {
 			$cols
 		);
 
+		// Initialize markdown.
 		$markdown = '';
 
 		// Heading.
@@ -118,11 +240,13 @@ class CLI {
 		}
 		$markdown .= "|\n";
 		foreach ( $heading as $index => $item ) {
-			$markdown .= '| ' . str_pad( '', $widths[ $index ], '-' ) . ' ';
+			$markdown .= '|-' . str_pad( '', $widths[ $index ], '-' ) . '-';
 		}
 		$markdown .= "|\n";
 
+		// Rows.
 		foreach ( $array as $row ) {
+			// Add row.
 			$markdown .= '| ' . implode(
 					' | ',
 					array_map(
@@ -141,9 +265,9 @@ class CLI {
 	/**
 	 * Array to CSV.
 	 *
-	 * @param array<string, string|array> $array
+	 * @param array<int, string|array> $array Array to convert to CSV.
 	 *
-	 * @return string
+	 * @return string CSV string.
 	 */
 	private function array_to_csv( $array ): string {
 		// Convert arrays to strings.
@@ -155,6 +279,7 @@ class CLI {
 			}
 		}
 
+		// Convert array to CSV.
 		$csv     = '';
 		$heading = array_keys( $array[0] );
 		$csv     .= implode( ',', $heading ) . "\n";

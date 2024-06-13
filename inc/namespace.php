@@ -14,6 +14,12 @@ use wpdb;
 // Minimum should be "1" OR Maximum should be "60".
 define( 'CHUNK_LIMIT', 60 );
 
+//define( 'DRUPAL_DB_USER', LEBOAT_MIGRATION_DB_USER );
+//define( 'DRUPAL_DB_PASSWORD', LEBOAT_MIGRATION_DB_PASSWORD );
+//define( 'DRUPAL_DB_NAME', LEBOAT_MIGRATION_DB_NAME );
+//define( 'DRUPAL_DB_HOST', LEBOAT_MIGRATION_DB_HOST );
+//define( 'DRUPAL_MEDIA_PATH', LEBOAT_MIGRATION_MEDIA_PATH );
+
 /**
  * Bootstrap plugin.
  *
