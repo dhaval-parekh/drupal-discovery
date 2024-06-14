@@ -104,13 +104,14 @@ class Drupal {
 	 * @return array{}|array{
 	 *     array{
 	 *         type: string,
-	 *         count: int
+	 *         count: int,
+	 *         url: string
 	 *     }
 	 * }
 	 */
 	function get_node_types(): array {
 		// Database query.
-		$query = "SELECT `type`, count(1) AS `count` FROM node GROUP BY `type`;";
+		$query = "SELECT nid, `type`, count(1) AS `count`, ( SELECT alias FROM url_alias WHERE source = CONCAT( 'node/', node.nid ) AND language='en' ) AS drupal_url FROM node GROUP BY `type`;";
 
 		// Get the result.
 		$result = $this->database->get_results( $query, ARRAY_A );
@@ -123,6 +124,7 @@ class Drupal {
 			$output[ $item['type'] ] = [
 				'type'  => $item['type'],
 				'count' => $item['count'],
+				'url'   => $item['drupal_url'],
 			];
 		}
 
