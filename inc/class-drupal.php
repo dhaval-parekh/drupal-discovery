@@ -463,7 +463,8 @@ class Drupal {
 
 					if ( 'node' === $type ) {
 						$custom_field_query = "SELECT\n\tnode.nid,\n\t" . implode( ",\n\t", $select ) .
-						                      "\nFROM\n\tnode\n\tINNER JOIN {$field['database_table']} ON node.nid = {$field['database_table']}.entity_id AND node.language = $field_name.language;";
+						                      "\nFROM\n\tnode\n\tINNER JOIN {$field['database_table']} ON node.nid = {$field['database_table']}.entity_id AND {$field['database_table']}.language IN ( node.language, 'und' )" .
+						                      "\nWHERE\n\tnode.type = '$entity_type';";
 					} elseif ( 'taxonomy' === $type ) {
 						$custom_field_query = "SELECT\n\tterm.tid,\n\t" . implode( ",\n\t", $select ) .
 						                      "\nFROM\n\ttaxonomy_term_data AS term\n\tINNER JOIN `$db_table` AS `$field_name` ON term.tid = $field_name.entity_id AND term.langcode = $field_name.langcode;";
