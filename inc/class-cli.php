@@ -108,6 +108,18 @@ class CLI {
 		echo "\n\n\n### Taxonomies \n\n";
 		echo $this->array_to_markdown_table( array_values( $taxonomies ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
+		// Get Media Types.
+		$media_types = $drupal->get_media_types();
+
+		// Output the media types.
+		echo "\n\n\n### Media Types \n\n";
+		echo $this->array_to_markdown_table( array_values( $media_types ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
+
+		$tital_media = wp_list_pluck( $media_types, 'count' );
+		$tital_media = array_sum( $tital_media );
+		echo "\n#### Total Media Types : $tital_media \n";
+
 		// Get languages.
 		$languages = $drupal->get_languages();
 

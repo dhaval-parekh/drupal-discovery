@@ -164,6 +164,38 @@ class Drupal {
 		return $output;
 	}
 
+	/**
+	 * Get media types.
+	 *
+	 * @return array{}|array{
+	 *     array{
+	 *         type: string,
+	 *         count: int
+	 *    }
+	 * }
+	 */
+	function get_media_types(): array {
+		// Database query.
+		$query = "SELECT filemime as `type`, count(1) as `count` FROM file_managed GROUP BY filemime;";
+
+		// Get the result.
+		$result = $this->database->get_results( $query, ARRAY_A );
+
+		// Output.
+		$output = [];
+
+		// Loop through the result.
+		foreach ( $result as $item ) {
+			$output[ $item['type'] ] = [
+				'type'  => $item['type'],
+				'count' => $item['count'],
+			];
+		}
+
+		// Return the output.
+		return $output;
+	}
+
 	protected function get_field_config( string $field_name = '' ) {
 		$field_config = $this->database->get_row(
 			"SELECT * FROM field_config WHERE field_name='$field_name';",
